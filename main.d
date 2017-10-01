@@ -21,7 +21,7 @@ import derelict.sdl2.gfx.primitives;
 import derelict.sdl2.mixer;
 import derelict.sdl2.ttf;
 import derelict.opengl3.gl3;
-import derelict.glfw3.glfw3;
+//import derelict.glfw3.glfw3;
 //import derelict.opengl3;
 
 void InitDerelict() {
