@@ -11,7 +11,9 @@
 #include "SDL_opengl.h"
 */
 
-import std.stdio;
+import std.stdio : stdout, stderr;
+import std.traits : isSomeString;
+
 import derelict.sdl2.sdl;
 import derelict.sdl2.image;
 import derelict.sdl2.gfx.gfx;
@@ -19,16 +21,11 @@ import derelict.sdl2.gfx.primitives;
 import derelict.sdl2.mixer;
 import derelict.sdl2.ttf;
 import derelict.opengl3.gl3;
+import derelict.glfw3.glfw3;
+//import derelict.opengl3;
 
 void InitDerelict() {
 	string[] errors;
-
-	try {
-		import derelict.sqlite3.sqlite : DerelictSQLite3;
-		DerelictSQLite3.load();
-	} catch (Throwable) {
-		errors ~= "Failed to find the library SQLite3.";
-	}
 
 	try {
 		DerelictSDL2.load(SharedLibVersion(2, 0, 2));
@@ -126,25 +123,38 @@ void gluPerspective(GLdouble fovy, GLdouble aspect, GLdouble zNear, GLdouble zFa
 float width = 200, height = 200;
 float bpp = 0;
 float near = 10.0, far = 100000.0, fovy = 45.0;
-float position[3] = {0,0,-40};
-const float triangle[9] = {
+float[3] position = [0,0,-40];
+const float[9] triangle = [
 	  0,  10, 0,  // top point
 	-10, -10, 0,  // bottom left
 	 10, -10, 0   // bottom right
-};
+];
 float rotate_degrees  = 90;
-float rotate_axis[3] = {0,1,0};
+float[3] rotate_axis = [0,1,0];
 
-SDL_Surface* screen = nullptr;
+SDL_Surface* screen = null;
+
+public char* toSZ(S)(S value)
+if(isSomeString!S) {
+	import std.string : toStringz;
+	return cast(char*)toStringz(value);
+}
+
+string GetSDLError() {
+	import std.string : fromStringz;
+	return cast(string) fromStringz(SDL_GetError());
+}
 
 bool IsSurfaceRGBA8888(const SDL_Surface* surface) {
-	return (surface->format->Rmask == 0xFF000000 &&
-			surface->format->Gmask == 0x00FF0000 &&
-			surface->format->Bmask == 0x0000FF00 &&
-			surface->format->Amask == 0x000000FF);
+	return (surface.format.Rmask == 0xFF000000 &&
+			surface.format.Gmask == 0x00FF0000 &&
+			surface.format.Bmask == 0x0000FF00 &&
+			surface.format.Amask == 0x000000FF);
 }
-/*
+
 SDL_Surface* EnsureSurfaceRGBA8888(SDL_Surface* surface) {
+	import std.string : format;
+
 	// Just return if it is already RGBA8888
 	if (IsSurfaceRGBA8888(surface)) {
 		return surface;
@@ -153,33 +163,37 @@ SDL_Surface* EnsureSurfaceRGBA8888(SDL_Surface* surface) {
 	// Convert the surface into a new one that is RGBA8888
 	//std::cout << "Converting surface to RGBA8888 format." << std::endl;
 	SDL_Surface* new_surface = SDL_ConvertSurfaceFormat(surface, SDL_PIXELFORMAT_RGBA8888, 0);
-	if (new_surface == nullptr) {
-		stringstream ss;
-		ss << "Failed to convert surface to RGBA8888 format" <<
-		" at " << __FILE__ << ":" << __LINE__;
-		throw std::runtime_error(ss.str());
+	if (new_surface == null) {
+		throw new Exception("Failed to convert surface to RGBA8888 format: %s".format(GetSDLError()));
 	}
 	SDL_FreeSurface(surface);
 
 	// Make sure the new surface is RGBA8888
 	if (! IsSurfaceRGBA8888(new_surface)) {
-		stringstream ss;
-		ss << "Failed to convert surface to RGBA8888 format" <<
-		" at " << __FILE__ << ":" << __LINE__;
-		throw std::runtime_error(ss.str());
+		throw new Exception("Failed to convert surface to RGBA8888 format: %s".format(GetSDLError()));
 	}
 	return new_surface;
 }
-*/
-SDL_Surface* LoadSurface(std::string file_name) {
-	SDL_Surface* surface = IMG_Load(file_name.c_str());
-	if (surface == nullptr) {
-		stringstream ss;
-		ss << "Failed to load surface \"" << file_name << "\"" <<
-		" at " << __FILE__ << ":" << __LINE__;
-		throw std::runtime_error(ss.str());
+
+SDL_Surface* LoadSurface(const string file_name) {
+	import std.file : exists;
+	import std.string : format;
+
+	string complete_name = file_name;
+	if (! exists(complete_name)) {
+		throw new Exception("File does not exist: %s".format(complete_name));
 	}
-	//surface = EnsureSurfaceRGBA8888(surface);
+
+	SDL_Surface* surface = IMG_Load(complete_name.toSZ);
+	if (surface == null) {
+		throw new Exception("Failed to load surface \"%s\": %s".format(file_name, GetSDLError()));
+	}
+
+	if (surface.format.BitsPerPixel < 32) {
+		throw new Exception("Image has no alpha channel \"%s\"".format(file_name));
+	}
+
+	surface = EnsureSurfaceRGBA8888(surface);
 
 	return surface;
 }
@@ -188,10 +202,10 @@ void render() {
 	SDL_Event event;
 	while ( SDL_PollEvent( &event ) ) {
 		if ( event.type == SDL_KEYDOWN || event.type == SDL_KEYUP ) {
-			emscripten_cancel_main_loop();
+			//emscripten_cancel_main_loop();
 			SDL_Quit();
 		}	else if (event.type == SDL_QUIT) {
-			emscripten_cancel_main_loop();
+			//emscripten_cancel_main_loop();
 			SDL_Quit();
 		}
 	}
@@ -213,7 +227,7 @@ void render() {
 		angle += rotate_degrees * delta;
 
 		// c modulo operator only supports ints as arguments
-		#define MOD( n, d ) (n - (d * (int) ( n / d )))
+		auto MOD(T)(T n, T d) { return (n - (d * cast(int) ( n / d ))); }
 		angle = MOD( angle, 360 );
 
 		glRotatef( angle, rotate_axis[0], rotate_axis[1], rotate_axis[2] );
@@ -267,15 +281,15 @@ int main() {
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	// Load, create texture and generate mipmaps
-	SDL_Surface* surface = nullptr;
+	SDL_Surface* surface = null;
 	try {
 		//LoadSurface("awesomeface.png");
-	} catch (const std::runtime_error &err) {
+	} catch (Throwable err) {
 		//std::exception_ptr err = std::current_exception();
-		cout << "!!!" << err.what() << endl;
+		stderr.writefln("!!! %s", err);
 		return 1;
 	}
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, surface->w, surface->h, 0, GL_RGBA, GL_UNSIGNED_INT_8_8_8_8, surface->pixels);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, surface.w, surface.h, 0, GL_RGBA, GL_UNSIGNED_INT_8_8_8_8, surface.pixels);
 	glGenerateMipmap(GL_TEXTURE_2D);
 	SDL_FreeSurface(surface);
 	glBindTexture(GL_TEXTURE_2D, 0);
