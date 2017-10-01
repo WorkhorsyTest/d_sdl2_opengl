@@ -1,0 +1,19 @@
+{
+	"name": "main",
+	"description": "Example of opengl and sdl2 in D",
+	"authors": [
+		"Matthew Brennan Jones <matthew.brennan.jones@gmail.com>",
+	],
+	"homepage": "https://github.com/WorkhorsyTest/d_sdl2_opengl",
+	"copyright": "Copyright (c) 2017 Matthew Brennan Jones",
+	"license": "MIT",
+	"targetType": "executable",
+	"mainSourceFile": "main.d",
+
+	"dependencies": {
+		"derelict-util": "~>2.0",
+		"derelict-sdl2": "~>2.0",
+		"derelict-sdl2_gfx": "~>1.0",
+		"derelict-gl3": "~>1.0",
+	},
+}

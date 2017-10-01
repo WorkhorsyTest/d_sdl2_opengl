@@ -1,0 +1,12 @@
+
+.dub/
+dub.selections.json
+*.sqlite
+*.dll
+*.exp
+*.exe
+*.lib
+*.def
+*.obj
+*.o
+*.log
